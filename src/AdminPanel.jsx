@@ -6,7 +6,7 @@ export default function AdminPanel({ store, mutate, toast }) {
   const [modal, setModal] = useState(null); // {type:'item'|'user', id}
 
   const nav = [["guide", "📖 Guide & How-To"], ["dashboard", "📊 Dashboard"], ["listings", "🏷️ Listings"], ["orders", "🧾 Orders"], ["users", "👥 Users"], ["disputes", "⚖️ Disputes"], ["reports", "🚩 Reports"]];
-  const moneyNav = [["featurereq", "⭐ Feature requests"], ["banners", "📢 Ad banners"], ["fees", "💵 Category fees"]];
+  const moneyNav = [["featurereq", "⭐ Feature requests"], ["banners", "📢 Ad banners"], ["fees", "💵 Category fees"], ["settlements", "🏦 Settlements"]];
 
   return (
     <div className="admin-main" style={{ display: "flex" }}>
@@ -29,6 +29,7 @@ export default function AdminPanel({ store, mutate, toast }) {
         {page === "featurereq" && <FeatureReq store={store} mutate={mutate} toast={toast} />}
         {page === "banners" && <Banners store={store} mutate={mutate} toast={toast} />}
         {page === "fees" && <Fees store={store} mutate={mutate} toast={toast} />}
+        {page === "settlements" && <Settlements store={store} mutate={mutate} toast={toast} />}
       </div>
 
       {modal?.type === "item" && <ItemModal store={store} mutate={mutate} toast={toast} id={modal.id} close={() => setModal(null)} />}
@@ -82,6 +83,7 @@ function Guide({ setPage }) {
     {card("⭐", "Feature requests", <>When a seller asks to feature their listing (from the app), it appears under <b>Feature requests</b>. Once they have sent the FJD $5 by M-PAiSA / MyCash, click <b>Confirm &amp; feature</b> and it pins to the top of the app.</>, "#F26A4B")}
     {card("📢", "Ad banners", <>On the <b>Ad banners</b> page you can turn a promotional banner on or off in the app home feed. Charge a local business to show their banner, or use the slot for your own promotions.</>, "#F26A4B")}
     {card("💵", "Category fees", <>On the <b>Category fees</b> page, set a flat listing fee for high-value categories like Vehicles or Electronics. Turn a fee on or off anytime. Sellers see the fee noted when they list in that category.</>, "#F26A4B")}
+    {card("🏦", "Bank settlements", <>Buyer payments collect in the merchant balance and go to the bank in bulk — <b>weekly</b>, or early once the balance reaches your threshold. Set the rule on the <b>Settlements</b> page and view the transfer history.</>, "#0B6E6E")}
 
     <h2 style={{ fontSize: 18, margin: "22px 0 14px", color: "var(--ink)" }}>A quick walkthrough to try now</h2>
     <div style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: 12, padding: 20 }}>
@@ -255,6 +257,71 @@ function Fees({ store, mutate, toast }) {
       {store.categoryFees.map((f, i) => (
         <tr key={f.cat}><td><b>{f.cat}</b></td><td>{f.on ? "$" + f.fee : "—"}</td><td><Tag kind={f.on ? "live" : "hidden-t"}>{f.on ? "on" : "off"}</Tag></td>
           <td><button className={"mini " + (f.on ? "o" : "g")} onClick={() => { mutate(s => { s.categoryFees[i].on = !s.categoryFees[i].on; }); toast("Category fee updated"); }}>{f.on ? "Turn off" : "Turn on"}</button></td></tr>
+      ))}
+    </tbody></table>
+  </>);
+}
+
+// ============ SETTLEMENTS ============
+function Settlements({ store, mutate, toast }) {
+  const s = store.settlement;
+  // Held balance = paid orders not yet settled to the bank (demo: sum of paid orders)
+  const held = store.orders.filter(o => o.status === "paid").reduce((a, b) => a + b.amount, 0);
+  const readyForEarly = held >= s.thresholdFJD;
+  const stat = (label, value, accent) => (
+    <div style={{ background: "#fff", borderRadius: 14, padding: 20, boxShadow: "var(--shadow-card)", borderTop: `3px solid ${accent}` }}>
+      <div style={{ fontSize: 26, fontWeight: 800, color: accent }}>{value}</div>
+      <div style={{ fontSize: 13, color: "var(--slate)", marginTop: 4 }}>{label}</div>
+    </div>
+  );
+  return (<>
+    <H1>🏦 Bank Settlements</H1>
+    <Desc>Buyer payments are collected in the merchant balance and sent to the bank in bulk — <b>weekly</b>, or early once the balance reaches the threshold. This keeps transfer costs low.</Desc>
+
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 16, marginBottom: 22 }}>
+      {stat("Held merchant balance", "$" + held.toFixed(2), "#0B6E6E")}
+      {stat("Early-transfer threshold", "$" + s.thresholdFJD.toFixed(0), "#E9B949")}
+      {stat("Next scheduled run", s.nextRun, "#0E8A8A")}
+    </div>
+
+    <div style={{ background: "#fff", borderRadius: 14, padding: 20, boxShadow: "var(--shadow-card)", marginBottom: 20 }}>
+      <div style={{ fontWeight: 800, marginBottom: 14 }}>Settlement rule</div>
+      <div className="adm-field" style={{ maxWidth: 340 }}>
+        <label>When to send funds to the bank</label>
+        <select value={s.schedule} onChange={e => { mutate(st => { st.settlement.schedule = e.target.value; }); toast("Settlement schedule updated"); }}>
+          <option value="weekly">Weekly (every Monday)</option>
+          <option value="threshold">Only when threshold is reached</option>
+        </select>
+      </div>
+      <div className="adm-field" style={{ maxWidth: 340 }}>
+        <label>Early-transfer threshold (FJD)</label>
+        <input type="number" defaultValue={s.thresholdFJD} onBlur={e => { const v = +e.target.value || 0; mutate(st => { st.settlement.thresholdFJD = v; }); toast("Threshold updated"); }} />
+      </div>
+      <div style={{ fontSize: 12.5, color: "var(--slate)", lineHeight: 1.6, marginTop: 4 }}>
+        {s.schedule === "weekly"
+          ? <>Funds transfer <b>every Monday</b>. If the held balance reaches <b>${s.thresholdFJD}</b> sooner, an early bulk transfer is triggered automatically.</>
+          : <>Funds transfer <b>only</b> once the held balance reaches <b>${s.thresholdFJD}</b>.</>}
+      </div>
+    </div>
+
+    <div style={{ background: readyForEarly ? "#E7F6EF" : "var(--sand)", borderRadius: 14, padding: 16, marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ fontSize: 22 }}>{readyForEarly ? "✅" : "⏳"}</div>
+      <div style={{ flex: 1, fontSize: 13.5, color: "var(--slate)" }}>{readyForEarly ? <>Held balance has reached the threshold — ready for a bulk transfer.</> : <>Held balance is building. An early transfer triggers at <b>${s.thresholdFJD}</b>, otherwise it runs on schedule.</>}</div>
+      <button className="adminbtn" onClick={() => {
+        if (held <= 0) { toast("Nothing to settle yet"); return; }
+        mutate(st => {
+          st.settlement.history.unshift({ id: st.nextSettle++, date: "Just now", amount: held, method: "Bulk bank transfer" });
+          st.settlement.lastRun = "Just now";
+          st.orders.forEach(o => { if (o.status === "paid") o.status = "settled"; });
+        });
+        toast("Bulk transfer sent to bank ✓");
+      }}>Run settlement now</button>
+    </div>
+
+    <div style={{ fontWeight: 800, margin: "0 0 10px" }}>Settlement history</div>
+    <table><thead><tr><th>Date</th><th>Amount</th><th>Method</th></tr></thead><tbody>
+      {store.settlement.history.map(h => (
+        <tr key={h.id}><td>{h.date}</td><td><b>${h.amount.toFixed(2)}</b></td><td>{h.method}</td></tr>
       ))}
     </tbody></table>
   </>);

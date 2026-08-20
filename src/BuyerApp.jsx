@@ -258,16 +258,27 @@ function Detail({ item: l, go, following, toggleFollow, liked, toggleLike, heart
 }
 
 // ============ CHECKOUT ============
+// Platform & Processing Fee — bundles carrier fee, fixed charge & VAT into one line.
+// Rates set so PreLoved Fiji nets the same profit on either wallet.
+export function processingFee(price, key) {
+  if (key === "mpaisa") return price * 0.05 + 0.40; // Vodafone M-PAiSA: 5% + $0.40
+  if (key === "mycash") return price * 0.05 + 0.35; // Digicel MyCash: 5% + $0.35
+  if (key === "card") return price * 0.05 + 0.40;   // Card: same basis as M-PAiSA
+  return 0;                                          // Cash on meetup: no processing fee
+}
+
 function Checkout({ item: l, go, selectedPay, setSelectedPay, setPay }) {
   if (!l) return <div className="empty" style={{ paddingTop: 80 }}>Item not found.</div>;
-  const fee = 1.5;
-  const total = l.price + fee;
   const methods = [
     { id: 0, key: "mpaisa", icon: "📱", name: "M-PAiSA", sub: "Vodafone wallet" },
     { id: 1, key: "mycash", icon: "💳", name: "MyCash", sub: "Digicel wallet" },
     { id: 2, key: "card", icon: "💳", name: "Card", sub: "Visa / Mastercard" },
     { id: 3, key: "cash", icon: "🤝", name: "Cash on meetup", sub: "Pay in person" },
   ];
+  const key = selectedPay !== null ? methods[selectedPay].key : "mpaisa";
+  const isCash = key === "cash";
+  const fee = processingFee(l.price, key);
+  const total = l.price + fee;
   return (<>
     <div className="topbar"><button onClick={() => go("detail", l.id)}>←</button><div className="t">Checkout</div></div>
     <div style={{ padding: 16 }}>
@@ -288,7 +299,8 @@ function Checkout({ item: l, go, selectedPay, setSelectedPay, setPay }) {
 
       <div style={{ background: "#fff", borderRadius: 14, padding: 16, marginTop: 10, boxShadow: "var(--shadow-card)" }}>
         <Row k="Item price" v={`$${l.price.toFixed(2)}`} />
-        <Row k="Buyer protection" v={`$${fee.toFixed(2)}`} />
+        <Row k="Platform & Processing Fee" v={isCash ? "$0.00" : `$${fee.toFixed(2)}`} />
+        <div style={{ fontSize: 11, color: "var(--mist)", lineHeight: 1.45, marginTop: 2, marginBottom: 4 }}>{isCash ? "No processing fee — you'll pay in person at meetup." : "Includes carrier fees, fixed charges & applicable VAT, bundled into one transparent charge."}</div>
         <div style={{ borderTop: "1px solid var(--line)", margin: "10px 0" }} />
         <Row k="Total" v={`$${total.toFixed(2)}`} bold />
       </div>

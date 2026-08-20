@@ -53,7 +53,17 @@ export function freshStore(){
       {cat:"Women",fee:0,on:false},
       {cat:"Home",fee:0,on:false},
     ],
-    nextId:8, nextOrder:1003, nextOffer:1, nextFR:2,
+    settlement: {
+      // Bank settlement runs weekly, OR early once the held balance reaches the threshold.
+      schedule: "weekly",          // "weekly" | "threshold"
+      thresholdFJD: 500,           // trigger an early bulk transfer at this held balance
+      lastRun: "Mon, this week",
+      nextRun: "Mon, next week",
+      history: [
+        { id: 1, date: "Mon, last week", amount: 642.50, method: "Bulk bank transfer" },
+      ],
+    },
+    nextId:8, nextOrder:1003, nextOffer:1, nextFR:2, nextSettle:2,
   };
 }
 
